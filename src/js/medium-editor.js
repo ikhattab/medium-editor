@@ -12,6 +12,12 @@ if (typeof module === 'object') {
 (function (window, document) {
     'use strict';
 
+    var KEYS = {
+        SPACE: 32,
+        TAB: 9,
+        ENTER: 13
+    };
+
     function extend(b, a) {
         var prop;
         if (b === undefined) {
@@ -153,7 +159,7 @@ if (typeof module === 'object') {
                     this.elements[i].setAttribute('data-placeholder', this.options.placeholder);
                 }
                 this.elements[i].setAttribute('data-medium-element', true);
-                this.bindParagraphCreation(i).bindReturn(i).bindTab(i);
+                this.bindParagraphCreation(i).bindReturn(i).bindTab(i).autolink(i);
                 if (!this.options.disableToolbar && !this.elements[i].getAttribute('data-disable-toolbar')) {
                     addToolbar = true;
                 }
@@ -227,7 +233,7 @@ if (typeof module === 'object') {
             this.elements[index].addEventListener('keypress', function (e) {
                 var node = getSelectionStart(),
                     tagName;
-                if (e.which === 32) {
+                if (e.which === KEYS.SPACE) {
                     tagName = node.tagName.toLowerCase();
                     if (tagName === 'a') {
                         document.execCommand('unlink', false, null);
@@ -241,7 +247,7 @@ if (typeof module === 'object') {
                 if (node && node.getAttribute('data-medium-element') && node.children.length === 0 && !(self.options.disableReturn || node.getAttribute('data-disable-return'))) {
                     document.execCommand('formatBlock', false, 'p');
                 }
-                if (e.which === 13) {
+                if (e.which === KEYS.ENTER) {
                     node = getSelectionStart();
                     tagName = node.tagName.toLowerCase();
                     if (!(self.options.disableReturn || this.getAttribute('data-disable-return')) &&
@@ -278,7 +284,7 @@ if (typeof module === 'object') {
         bindReturn: function (index) {
             var self = this;
             this.elements[index].addEventListener('keypress', function (e) {
-                if (e.which === 13) {
+                if (e.which === KEYS.ENTER) {
                     if (self.options.disableReturn || this.getAttribute('data-disable-return')) {
                         e.preventDefault();
                     } else if (self.options.disableDoubleReturn || this.getAttribute('data-disable-double-return')) {
@@ -291,10 +297,100 @@ if (typeof module === 'object') {
             });
             return this;
         },
+       
+        autolink: function (index) {
+            this.elements[index].addEventListener('keypress', function (e) {
+                if (e.which === KEYS.SPACE) {
+                    var selection     = window.getSelection(),
+                        range       = selection.getRangeAt(0),
+                        newNode     = document.createElement('a'),
+                        newNode2     = document.createElement('a'),
+                        parentOfNewNode,
+                        parentOfNewNode2,
+                        ReUrl = /\b(www\.[a-z]+\.[a-z]{2,4})\b/,
+                        matchedUrlBeforeSpace,
+                        matchedUrlAfterSpace,
+                        isSpaceBeforeUrl,
+                        protocol,
+                        newText;                    
+                    
+                    newNode.appendChild(document.createTextNode(''));
+                    range.insertNode(newNode);
+                    parentOfNewNode = newNode.parentNode;
+                    
+                    matchedUrlBeforeSpace = newNode.previousSibling.textContent.match(ReUrl);
+                    matchedUrlAfterSpace = newNode.nextSibling.textContent.match(ReUrl);
+                    if (!matchedUrlBeforeSpace && !matchedUrlAfterSpace) {
+                        parentOfNewNode.removeChild(newNode);
+                        parentOfNewNode.normalize(); //merge adjacent text nodes
+                        return;
+                    }
+
+                    
+                    
+                    
+                    if (matchedUrlAfterSpace){
+                        newText = newNode.nextSibling.textContent.replace(ReUrl, '');
+                        newNode.nextSibling.textContent = newText;
+                        newNode.textContent = matchedUrlAfterSpace[1];
+                        
+                        protocol = /^[https?:\/\/|ssh:\/\/|ftp:\/\/|file:\/]$/.test(matchedUrlAfterSpace[1]);
+
+                        if(!protocol){
+                            matchedUrlAfterSpace[1] = 'http://' + matchedUrlAfterSpace[1];
+                        }
+                        
+
+                        newNode.href = matchedUrlAfterSpace[1];
+                        range.setStart(range.startContainer, range.startOffset); 
+                        range.setStartBefore(newNode);
+                        range.setEndBefore(newNode);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }else{
+                        parentOfNewNode.removeChild(newNode);
+                        parentOfNewNode.normalize(); //merge adjacent text nodes
+                    }
+                    
+                    newNode2.appendChild(document.createTextNode(''));
+                    range.insertNode(newNode2);
+                    parentOfNewNode2 = newNode2.parentNode;
+
+                    if (matchedUrlBeforeSpace) {
+                        isSpaceBeforeUrl = 
+                          (/^\b/.test(matchedUrlBeforeSpace[0])) ||
+                          (newNode2.previousSibling.previousSibling &&
+                           newNode2.previousSibling.previousSibling.textContent.match(/\b/));
+                    }
+
+                    if (matchedUrlBeforeSpace && isSpaceBeforeUrl){
+                        newText = newNode2.previousSibling.textContent.replace(ReUrl, '');
+                        newNode2.previousSibling.textContent = newText;
+                        newNode2.textContent = matchedUrlBeforeSpace[1];
+                        protocol = /^[https?:\/\/|ssh:\/\/|ftp:\/\/|file:\/]$/.test(matchedUrlBeforeSpace[1]);
+
+                        if(!protocol){
+                            matchedUrlBeforeSpace[1] = 'http://' + matchedUrlBeforeSpace[1];
+                        }
+
+                        newNode2.href = matchedUrlBeforeSpace[1];
+                        range.setStart(range.startContainer, range.startOffset); 
+                        range.setStartAfter(newNode2);
+                        range.setEndAfter(newNode2);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }else{
+                        parentOfNewNode2.removeChild(newNode2);
+                        parentOfNewNode2.normalize(); //merge adjacent text nodes
+                    }
+                }
+            });
+            return this;
+        },
 
         bindTab: function (index) {
             this.elements[index].addEventListener('keydown', function (e) {
-                if (e.which === 9) {
+                if (e.which === KEYS.TAB) {
                     // Override tab only for pre nodes
                     var tag = getSelectionStart().tagName.toLowerCase();
                     if (tag === 'pre') {
